@@ -58,6 +58,18 @@ export async function listAllFilesFtp() {
             if (item.isDirectory()) {
                 // Nếu đang ở root, folder này là "Hospital"
                 const nextHospital = currentPath === basePath ? item.name : hospitalName;
+                
+                try {
+                   const stat = await fs.stat(absolutePath);
+                   allFiles.push({
+                       name: item.name,
+                       path: relativePath,
+                       hospital: hospitalName,
+                       isDirectory: true,
+                       updatedAt: stat.mtime
+                   });
+                } catch(e) {}
+                
                 await scanDir(absolutePath, nextHospital);
             } else {
                 if (item.name.toLowerCase().endsWith('.docx') || item.name.toLowerCase().endsWith('.xlsx') || item.name.toLowerCase().endsWith('.pdf')) {
@@ -67,6 +79,7 @@ export async function listAllFilesFtp() {
                             name: item.name,
                             path: relativePath,
                             hospital: hospitalName,
+                            isDirectory: false,
                             size: stat.size,
                             updatedAt: stat.mtime
                         });

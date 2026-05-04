@@ -1,13 +1,18 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 
 export default function FileExplorer({ files, selectedFolder }) {
+  const router = useRouter();
+  const fileInputRef = useRef(null);
+  
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
   const [deepSearchPaths, setDeepSearchPaths] = useState(null); // null means not deep searching
   const [isDeepSearching, setIsDeepSearching] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
   const removeAccents = (str) => {
     return str.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -38,6 +43,59 @@ export default function FileExplorer({ files, selectedFolder }) {
       setDeepSearchPaths(null);
   };
 
+  const handleCreateFolder = async () => {
+      const folderName = prompt('Nhập tên thư mục mới:');
+      if (!folderName || !folderName.trim()) return;
+
+      const newPath = currentPath ? `${currentPath}/${folderName.trim()}` : folderName.trim();
+      
+      setIsUploading(true);
+      try {
+          const res = await fetch('/api/mkdir', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ folderPath: newPath })
+          });
+          if (res.ok) {
+              router.refresh();
+          } else {
+              alert('Lỗi: ' + await res.text());
+          }
+      } catch (e) {
+          alert('Lỗi tạo thư mục: ' + e.message);
+      }
+      setIsUploading(false);
+  };
+
+  const handleFileUpload = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const filePath = currentPath ? `${currentPath}/${file.name}` : file.name;
+
+      setIsUploading(true);
+      try {
+          const formData = new FormData();
+          formData.append('path', filePath);
+          formData.append('file', file);
+          
+          const res = await fetch('/api/save', {
+              method: 'POST',
+              body: formData
+          });
+          
+          if (res.ok) {
+              router.refresh();
+          } else {
+              alert('Lỗi tải file: ' + await res.text());
+          }
+      } catch (e) {
+          alert('Lỗi upload: ' + e.message);
+      }
+      setIsUploading(false);
+      event.target.value = ''; // reset input
+  };
+
   const currentPath = selectedFolder || '';
 
   const filteredFiles = useMemo(() => {
@@ -58,6 +116,7 @@ export default function FileExplorer({ files, selectedFolder }) {
 
     // Nếu không search, chỉ lấy những file trực thuộc currentPath
     return files.filter(f => {
+        if (f.isDirectory) return false;
         const fileDir = f.path.substring(0, f.path.lastIndexOf('/')) || '';
         return fileDir === currentPath;
     });
@@ -69,18 +128,35 @@ export default function FileExplorer({ files, selectedFolder }) {
 
      const subFolders = new Set();
      files.forEach(f => {
-         const fileDir = f.path.substring(0, f.path.lastIndexOf('/')) || '';
-         if (fileDir.startsWith(currentPath ? currentPath + '/' : '') && fileDir !== currentPath) {
-             // Với fileDir = "Cho Ray/2026/05", currentPath = "Cho Ray"
-             // remainder = "2026/05"
-             const remainder = fileDir.substring(currentPath ? currentPath.length + 1 : 0);
-             const nextFolderPart = remainder.split('/')[0];
-             if (nextFolderPart) {
-                 subFolders.add(currentPath ? `${currentPath}/${nextFolderPart}` : nextFolderPart);
+         if (f.isDirectory) {
+             // Nếu f là 1 thư mục, kiểm tra xem nó có phải thư mục con trực tiếp của currentPath không
+             const parentDir = f.path.includes('/') ? f.path.substring(0, f.path.lastIndexOf('/')) : '';
+             if (parentDir === currentPath) {
+                 subFolders.add(f.path);
+             } else if (currentPath === '' && f.path.indexOf('/') === -1) {
+                 // Folder ở Root
+                 subFolders.add(f.path);
+             } else if (f.path.startsWith(currentPath ? currentPath + '/' : '')) {
+                 // Folder nằm sâu bên trong, ta chỉ lấy thư mục con trực tiếp
+                 const remainder = f.path.substring(currentPath ? currentPath.length + 1 : 0);
+                 const nextFolderPart = remainder.split('/')[0];
+                 if (nextFolderPart) {
+                     subFolders.add(currentPath ? `${currentPath}/${nextFolderPart}` : nextFolderPart);
+                 }
              }
-         } else if (currentPath === '' && fileDir !== '') {
-             // Đang ở Root, lấy Root dirs
-             subFolders.add(fileDir.split('/')[0]);
+         } else {
+             // Fallback: suy luận folder từ đường dẫn của file (cho các file nằm trong subfolder)
+             const fileDir = f.path.substring(0, f.path.lastIndexOf('/')) || '';
+             if (fileDir.startsWith(currentPath ? currentPath + '/' : '') && fileDir !== currentPath) {
+                 const remainder = fileDir.substring(currentPath ? currentPath.length + 1 : 0);
+                 const nextFolderPart = remainder.split('/')[0];
+                 if (nextFolderPart) {
+                     subFolders.add(currentPath ? `${currentPath}/${nextFolderPart}` : nextFolderPart);
+                 }
+             } else if (currentPath === '' && fileDir !== '') {
+                 // Đang ở Root, lấy Root dirs
+                 subFolders.add(fileDir.split('/')[0]);
+             }
          }
      });
      return Array.from(subFolders).sort();
@@ -165,19 +241,44 @@ export default function FileExplorer({ files, selectedFolder }) {
                  </span>
              )}
          </div>
-         <div className="flex items-center gap-2 self-end sm:self-auto">
-            <button onClick={() => setViewMode('list')} className={`p-2 rounded-full hover:bg-[#e8eaed] transition-colors ${viewMode === 'list' ? 'bg-[#e8eaed] text-[#1f1f1f]' : 'text-[#444746]'}`} title="Chế độ danh sách">
-               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+
+         <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 mt-2 sm:mt-0">
+            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept=".docx,.xlsx,.pdf" />
+            
+            <button 
+               onClick={handleCreateFolder} 
+               disabled={isUploading}
+               className="flex items-center gap-1 md:gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-white border border-[#dadce0] text-[#1f1f1f] rounded-full text-xs md:text-sm font-medium hover:bg-[#f8fafd] transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
+               title="Tạo thư mục mới"
+            >
+               <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path></svg>
+               <span className="hidden sm:inline">Thư mục</span>
             </button>
-            <button onClick={() => setViewMode('grid')} className={`p-2 rounded-full hover:bg-[#e8eaed] transition-colors ${viewMode === 'grid' ? 'bg-[#e8eaed] text-[#1f1f1f]' : 'text-[#444746]'}`} title="Chế độ lưới">
-               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
+            
+            <button 
+               onClick={() => fileInputRef.current?.click()} 
+               disabled={isUploading}
+               className="flex items-center gap-1 md:gap-2 px-3 py-1.5 md:px-4 md:py-2 bg-[#0b57d0] text-white rounded-full text-xs md:text-sm font-medium hover:bg-[#0842a0] transition-colors shadow-sm disabled:opacity-50 whitespace-nowrap"
+               title="Tải tệp lên"
+            >
+               <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+               <span className="hidden sm:inline">{isUploading ? 'Đang tải...' : 'Tải tệp lên'}</span>
+            </button>
+
+            <div className="w-px h-6 bg-[#dadce0] mx-1 md:mx-2 hidden sm:block"></div>
+
+            <button onClick={() => setViewMode('list')} className={`p-1.5 md:p-2 rounded-full hover:bg-[#e8eaed] transition-colors ${viewMode === 'list' ? 'bg-[#e8eaed] text-[#1f1f1f]' : 'text-[#444746]'}`} title="Chế độ danh sách">
+               <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+            </button>
+            <button onClick={() => setViewMode('grid')} className={`p-1.5 md:p-2 rounded-full hover:bg-[#e8eaed] transition-colors ${viewMode === 'grid' ? 'bg-[#e8eaed] text-[#1f1f1f]' : 'text-[#444746]'}`} title="Chế độ lưới">
+               <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path></svg>
             </button>
          </div>
       </div>
 
       {/* Content Area */}
       <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 custom-scrollbar">
-         {filteredFiles.length === 0 ? (
+         {filteredFiles.length === 0 && folders.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-[#444746]">
                <svg className="w-24 h-24 md:w-32 md:h-32 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
                <h3 className="text-lg md:text-xl font-normal text-center">Không có mục nào</h3>
@@ -207,8 +308,9 @@ export default function FileExplorer({ files, selectedFolder }) {
                )}
 
                {/* Files Section */}
-               <div>
-                  <h3 className="text-sm font-medium text-[#444746] mb-4">Tệp {deepSearchPaths !== null && '(Kết quả tìm kiếm sâu)'}</h3>
+               {filteredFiles.length > 0 && (
+                  <div>
+                     <h3 className="text-sm font-medium text-[#444746] mb-4">Tệp {deepSearchPaths !== null && '(Kết quả tìm kiếm sâu)'}</h3>
                   
                   {viewMode === 'grid' ? (
                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
@@ -250,8 +352,8 @@ export default function FileExplorer({ files, selectedFolder }) {
                         ))}
                      </div>
                   )}
-               </div>
-
+                  </div>
+               )}
             </div>
          )}
       </div>

@@ -21,7 +21,7 @@ export default async function Dashboard({ searchParams }) {
 
   const rootDirs = Array.from(new Set(allFiles.map(f => {
       const parts = f.path.split('/');
-      return parts.length > 1 ? parts[0] : null;
+      return parts.length > 1 ? parts[0] : (f.isDirectory ? f.path : null);
   }))).filter(Boolean);
 
   const navItems = ['', ...rootDirs]; // '' is Root (Drive của tôi)
@@ -52,15 +52,6 @@ export default async function Dashboard({ searchParams }) {
           
           {/* Sidebar */}
           <aside className="w-full md:w-64 flex flex-row md:flex-col shrink-0 px-3 py-2 overflow-x-auto md:overflow-y-auto custom-scrollbar md:border-none border-b border-[#e0e0e0] bg-[#f8fafd]">
-              {session.user.role !== 'viewer' && (
-                 <div className="md:mb-4 mr-3 md:mr-0 shrink-0 flex items-center">
-                    <Link href="/manage" className="inline-flex items-center gap-3 bg-white hover:bg-[#f6f9fe] text-[#1f1f1f] shadow-elevation-1 hover:shadow-elevation-2 md:rounded-2xl rounded-full px-5 py-3 md:py-4 transition-all w-max whitespace-nowrap">
-                        <svg className="w-5 h-5 md:w-6 md:h-6 text-[#444746]" viewBox="0 0 24 24" fill="currentColor"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                        <span className="font-medium text-sm">Thêm mới</span>
-                    </Link>
-                 </div>
-              )}
-
               <nav className="flex flex-row md:flex-col flex-1 gap-2 md:gap-0.5 items-center md:items-stretch">
                   {navItems.map(nav => {
                       const isActive = currentPath === nav || (nav !== '' && currentPath.startsWith(nav));

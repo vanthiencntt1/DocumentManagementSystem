@@ -125,6 +125,45 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
      }
   };
 
+  const handleExportPdf = () => {
+      const element = document.getElementById('document-content-container');
+      if (!element) return;
+      
+      setLoading(true);
+      
+      if (window.html2pdf) {
+          generatePdf(element);
+          return;
+      }
+
+      const script = document.createElement('script');
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
+      script.onload = () => generatePdf(element);
+      script.onerror = () => {
+          alert("Lỗi tải thư viện PDF");
+          setLoading(false);
+      };
+      document.body.appendChild(script);
+  };
+
+  const generatePdf = (element) => {
+      const opt = {
+          margin:       [15, 15, 15, 15],
+          filename:     fileName.replace(/\.[^/.]+$/, "") + '.pdf', // Remove extension and add .pdf
+          image:        { type: 'jpeg', quality: 0.98 },
+          html2canvas:  { scale: 2, useCORS: true },
+          jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      
+      window.html2pdf().set(opt).from(element).save().then(() => {
+          setLoading(false);
+      }).catch((e) => {
+          console.error(e);
+          alert("Lỗi xuất PDF: " + e.message);
+          setLoading(false);
+      });
+  };
+
   const modules = {
       toolbar: [
           [{ 'header': [1, 2, 3, false] }],
@@ -156,6 +195,18 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                Lịch sử ({history.length})
             </button>
+
+            {fileName.toLowerCase().endsWith('.docx') && !isEditing && (
+                <button
+                   onClick={handleExportPdf}
+                   disabled={loading}
+                   className="flex-1 sm:flex-none justify-center bg-red-600 text-white px-3 py-2 rounded-xl text-xs sm:text-sm font-bold hover:bg-red-700 transition shadow-md flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
+                   title="Xuất file ra định dạng PDF"
+                >
+                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                   Xuất PDF
+                </button>
+            )}
 
             {canEdit && !isEditing && (
               <>
@@ -212,6 +263,7 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
                   </div>
                ) : (
                   <div 
+                      id="document-content-container"
                       className="p-4 md:p-12 text-[14px] md:text-[16px] font-['Inter'] leading-relaxed text-slate-800 prose max-w-none [&_table]:border-collapse [&_table]:w-full [&_table]:overflow-x-auto [&_td]:border [&_td]:border-slate-300 [&_td]:p-2 [&_img]:max-w-full"
                       dangerouslySetInnerHTML={{ __html: htmlContent }} 
                   />
