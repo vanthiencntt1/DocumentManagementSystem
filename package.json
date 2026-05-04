@@ -1,0 +1,30 @@
+{
+  "name": "dms",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@syncfusion/ej2-react-documenteditor": "^33.1.47",
+    "formidable": "^3.5.4",
+    "html-to-docx": "^1.8.0",
+    "lucide-react": "^1.8.0",
+    "mammoth": "^1.12.0",
+    "next": "14.2.35",
+    "next-auth": "^4.24.13",
+    "react": "^18",
+    "react-dom": "^18",
+    "react-quill": "^2.0.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "eslint": "^8",
+    "eslint-config-next": "14.2.35",
+    "postcss": "^8",
+    "tailwindcss": "^3.4.1"
+  }
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "email": "admin@congty.com",
+    "name": "Quản Trị Viên",
+    "password": "123",
+    "role": "admin"
+  },
+  {
+    "email": "editor@congty.com",
+    "name": "Biên Tập Viên",
+    "password": "123",
+    "role": "editor"
+  },
+  {
+    "email": "guest@congty.com",
+    "name": "Khách Truy Cập",
+    "password": "123",
+    "role": "viewer"
+  }
+]

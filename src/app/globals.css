@@ -1,0 +1,93 @@
+@import url("https://cdn.syncfusion.com/ej2/26.1.35/material.css");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #f8fafd; /* Material 3 Surface color */
+  --foreground: #1f1f1f;
+  --primary: #0b57d0; /* Google Drive primary blue */
+}
+
+body {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+/* Material 3 shadows */
+@layer utilities {
+  .shadow-elevation-1 {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.15);
+  }
+  .shadow-elevation-2 {
+    box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* Custom Scrollbar minimal */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #dadce0;
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #bdc1c6;
+}
+
+/* Office Viewer Styles */
+.office-viewer table {
+  border-collapse: collapse;
+  width: 100% !important;
+  font-size: 14px;
+  margin-bottom: 2rem;
+}
+.office-viewer td,
+.office-viewer th {
+  border: 1px solid #e2e8f0;
+  padding: 12px 16px;
+}
+.office-viewer th {
+  background-color: #f8fafc;
+  font-weight: 600;
+  color: #1f1f1f;
+}
+.office-viewer p {
+  margin-bottom: 1.2em;
+  line-height: 1.7;
+  color: #444746;
+}
+.office-viewer h1,
+.office-viewer h2,
+.office-viewer h3 {
+  margin-top: 1.8em;
+  margin-bottom: 0.8em;
+  font-weight: 500;
+  color: #1f1f1f;
+}
+.office-viewer h1 { font-size: 2em; }
+.office-viewer h2 { font-size: 1.5em; }
+
+/* Quill Overrides */
+.ql-container.ql-snow {
+  border: none !important;
+  font-size: 16px;
+}
+.ql-toolbar.ql-snow {
+  border: none !important;
+  border-bottom: 1px solid rgba(0,0,0,0.05) !important;
+  background: #ffffff;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.ql-editor {
+  min-height: 800px;
+  padding: 4rem !important;
+  line-height: 1.7;
+}
