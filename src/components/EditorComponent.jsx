@@ -33,28 +33,47 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
       script.src = src;
       script.onload = resolve;
       script.onerror = reject;
-      document.body.appendChild(script);
+      document.head.appendChild(script);
+  });
+
+  const waitForGlobal = (key, timeout = 8000) => new Promise((resolve, reject) => {
+      if (window[key]) return resolve(window[key]);
+      const start = Date.now();
+      const check = () => {
+          if (window[key]) return resolve(window[key]);
+          if (Date.now() - start > timeout) return reject(new Error(`Timeout: window.${key} không khả dụng`));
+          setTimeout(check, 100);
+      };
+      check();
   });
 
   // Tải nội dung
   useEffect(() => {
+    if (!streamUrl) return;
+    let cancelled = false;
+
     const loadFile = async () => {
        try {
            if (isDocx) {
                const res = await fetch(streamUrl);
                const blob = await res.blob();
                
-               // 1. Dùng mammoth để trích xuất text thuần cho việc Sửa Nhanh (Quill)
+               // 1. Mammoth: trích xuất text thuần để Sửa Nhanh
                const arrayBuffer = await blob.arrayBuffer();
                const result = await mammoth.convertToHtml({ arrayBuffer });
+               if (cancelled) return;
                setOriginalHtml(result.value);
                setEditHtml(result.value);
 
-               // 2. Dùng docx-preview để render layout chính xác
+               // 2. docx-preview: render layout chuẩn xác
                await loadScript("https://unpkg.com/jszip/dist/jszip.min.js");
+               await waitForGlobal('JSZip');
                await loadScript("https://unpkg.com/docx-preview/dist/docx-preview.min.js");
-               
+               await waitForGlobal('docx');
+
+               if (cancelled) return;
                if (window.docx && viewerRef.current) {
+                   viewerRef.current.innerHTML = ''; // clear trước khi render lại
                    await window.docx.renderAsync(blob, viewerRef.current, null, {
                        className: 'docx-viewer',
                        inWrapper: false,
@@ -67,15 +86,18 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
            } else if (isTxt) {
                const res = await fetch(streamUrl);
                const text = await res.text();
+               if (cancelled) return;
                const htmlText = `<p>${text.replace(/\n/g, '<br/>')}</p>`;
                setOriginalHtml(htmlText);
                setEditHtml(htmlText);
            }
        } catch (error) {
-           console.error("Lỗi đọc file", error);
+           if (!cancelled) console.error("Lỗi đọc file", error);
        }
     };
     loadFile();
+
+    return () => { cancelled = true; };
   }, [streamUrl, fileName, isDocx, isTxt]);
 
   // Load Lịch sử phiên bản
