@@ -38,35 +38,53 @@ export default function FileExplorer({ files, selectedFolder }) {
       setDeepSearchPaths(null);
   };
 
+  const currentPath = selectedFolder || '';
+
   const filteredFiles = useMemo(() => {
-    const query = removeAccents(searchQuery.trim());
-    
-    // Nếu có kết quả deep search, chỉ hiển thị các file nằm trong list deepSearchPaths
+    // Nếu đang có deep search paths
     if (deepSearchPaths !== null) {
        return files.filter(f => deepSearchPaths.includes(f.path));
     }
+    
+    const query = removeAccents(searchQuery.trim());
+    if (query) {
+      return files.filter(f => {
+        const fileName = removeAccents(f.name);
+        const filePath = removeAccents(f.path);
+        const keywords = query.split(' ').filter(k => k.length > 0);
+        return keywords.every(kw => fileName.includes(kw) || filePath.includes(kw));
+      });
+    }
 
-    if (!query) return files;
-
+    // Nếu không search, chỉ lấy những file trực thuộc currentPath
     return files.filter(f => {
-      const fileName = removeAccents(f.name);
-      const hospitalName = removeAccents(f.hospital);
-      
-      const keywords = query.split(' ').filter(k => k.length > 0);
-      return keywords.every(kw => 
-        fileName.includes(kw) || 
-        hospitalName.includes(kw)
-      );
+        const fileDir = f.path.substring(0, f.path.lastIndexOf('/')) || '';
+        return fileDir === currentPath;
     });
-  }, [files, searchQuery, deepSearchPaths]);
+  }, [files, searchQuery, deepSearchPaths, currentPath]);
 
-  // Trong Google Drive, thường hiển thị list file thay vì group quá rõ rệt, 
-  // nhưng nếu đang ở "Trang Tổng Quan" ta có thể hiện Folders trước, sau đó Files
   const folders = useMemo(() => {
-     if (selectedFolder !== 'Trang Tổng Quan') return [];
-     const uniqueHospitals = Array.from(new Set(filteredFiles.map(f => f.hospital)));
-     return uniqueHospitals;
-  }, [filteredFiles, selectedFolder]);
+     // Nếu đang search, không hiển thị folder, chỉ hiển thị file dạng list phẳng
+     if (searchQuery.trim() || deepSearchPaths !== null) return [];
+
+     const subFolders = new Set();
+     files.forEach(f => {
+         const fileDir = f.path.substring(0, f.path.lastIndexOf('/')) || '';
+         if (fileDir.startsWith(currentPath ? currentPath + '/' : '') && fileDir !== currentPath) {
+             // Với fileDir = "Cho Ray/2026/05", currentPath = "Cho Ray"
+             // remainder = "2026/05"
+             const remainder = fileDir.substring(currentPath ? currentPath.length + 1 : 0);
+             const nextFolderPart = remainder.split('/')[0];
+             if (nextFolderPart) {
+                 subFolders.add(currentPath ? `${currentPath}/${nextFolderPart}` : nextFolderPart);
+             }
+         } else if (currentPath === '' && fileDir !== '') {
+             // Đang ở Root, lấy Root dirs
+             subFolders.add(fileDir.split('/')[0]);
+         }
+     });
+     return Array.from(subFolders).sort();
+  }, [files, searchQuery, deepSearchPaths, currentPath]);
 
   return (
     <div className="flex flex-col h-full w-full bg-white relative">
@@ -128,12 +146,21 @@ export default function FileExplorer({ files, selectedFolder }) {
 
       {/* Toolbar */}
       <div className="px-4 md:px-6 py-3 md:py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between border-b border-[#e0e0e0] gap-3 sm:gap-0">
-         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3">
-             <h2 className="text-[20px] md:text-[22px] font-normal text-[#1f1f1f]">
-                {selectedFolder === 'Trang Tổng Quan' ? 'Drive của tôi' : (selectedFolder === '_chung' ? 'Thư mục chung' : selectedFolder)}
-             </h2>
+         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 overflow-hidden w-full">
+             <div className="flex items-center text-[18px] md:text-[20px] font-normal text-[#1f1f1f] whitespace-nowrap overflow-x-auto custom-scrollbar pb-1 sm:pb-0 w-full sm:w-auto shrink-0">
+                <Link href="/" className="hover:underline hover:text-[#0b57d0] shrink-0">Drive của tôi</Link>
+                {currentPath && currentPath.split('/').map((part, idx, arr) => {
+                    const pathSoFar = arr.slice(0, idx + 1).join('/');
+                    return (
+                        <span key={pathSoFar} className="flex items-center shrink-0">
+                           <svg className="w-5 h-5 mx-1 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"/></svg>
+                           <Link href={`/?folder=${encodeURIComponent(pathSoFar)}`} className="hover:underline hover:text-[#0b57d0]">{part === '_chung' ? 'Thư mục chung' : part}</Link>
+                        </span>
+                    );
+                })}
+             </div>
              {deepSearchPaths !== null && (
-                 <span className="text-xs font-bold text-white bg-green-600 px-3 py-1 rounded-full animate-pulse shadow-sm">
+                 <span className="text-xs font-bold text-white bg-green-600 px-3 py-1 rounded-full animate-pulse shadow-sm shrink-0">
                      Tìm thấy {filteredFiles.length} file
                  </span>
              )}
@@ -166,12 +193,15 @@ export default function FileExplorer({ files, selectedFolder }) {
                   <div className="mb-6 md:mb-8">
                      <h3 className="text-sm font-medium text-[#444746] mb-3 md:mb-4">Thư mục</h3>
                      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3 md:gap-4">
-                        {folders.map(hosp => (
-                           <Link key={hosp} href={`/?folder=${encodeURIComponent(hosp)}`} className="flex items-center gap-3 p-3 rounded-xl border border-[#dadce0] bg-[#f8fafd] hover:bg-[#e9eef6] transition-colors w-full overflow-hidden">
-                              <svg className="w-6 h-6 shrink-0 text-[#444746]" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
-                              <span className="font-medium text-sm text-[#1f1f1f] truncate">{hosp === '_chung' ? 'Thư mục chung' : hosp}</span>
-                           </Link>
-                        ))}
+                         {folders.map(folderPath => {
+                            const folderName = folderPath.split('/').pop();
+                            return (
+                               <Link key={folderPath} href={`/?folder=${encodeURIComponent(folderPath)}`} className="flex items-center gap-3 p-3 rounded-xl border border-[#dadce0] bg-[#f8fafd] hover:bg-[#e9eef6] transition-colors w-full overflow-hidden">
+                                  <svg className="w-6 h-6 shrink-0 text-[#444746]" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+                                  <span className="font-medium text-sm text-[#1f1f1f] truncate">{folderName === '_chung' ? 'Thư mục chung' : folderName}</span>
+                               </Link>
+                            )
+                         })}
                      </div>
                   </div>
                )}

@@ -19,14 +19,13 @@ export default async function Dashboard({ searchParams }) {
       console.error("FTP Error:", e);
   }
 
-  const rootDirs = Array.from(new Set(allFiles.map(f => f.hospital))).filter(h => h !== 'Tài Liệu Gốc');
-  const navItems = ['Trang Tổng Quan', 'Tài Liệu Gốc', ...rootDirs];
-  const selectedFolder = searchParams.folder || 'Trang Tổng Quan';
+  const rootDirs = Array.from(new Set(allFiles.map(f => {
+      const parts = f.path.split('/');
+      return parts.length > 1 ? parts[0] : null;
+  }))).filter(Boolean);
 
-  let displayFiles = allFiles;
-  if (selectedFolder !== 'Trang Tổng Quan') {
-      displayFiles = allFiles.filter(f => f.hospital === selectedFolder);
-  }
+  const navItems = ['', ...rootDirs]; // '' is Root (Drive của tôi)
+  const currentPath = searchParams.folder || '';
 
   return (
     <div className="h-screen bg-[#f8fafd] flex flex-col overflow-hidden text-[#1f1f1f]">
@@ -64,16 +63,17 @@ export default async function Dashboard({ searchParams }) {
 
               <nav className="flex flex-row md:flex-col flex-1 gap-2 md:gap-0.5 items-center md:items-stretch">
                   {navItems.map(nav => {
-                      const isActive = selectedFolder === nav;
-                      const label = nav === '_chung' ? 'Thư mục chung' : nav;
+                      const isActive = currentPath === nav || (nav !== '' && currentPath.startsWith(nav));
+                      const isExactActive = currentPath === nav;
+                      const label = nav === '' ? 'Drive của tôi' : (nav === '_chung' ? 'Thư mục chung' : nav);
 
                       return (
                          <Link 
                             key={nav} 
-                            href={`/?folder=${encodeURIComponent(nav)}`}
-                            className={`flex items-center gap-2 md:gap-3 px-4 py-2.5 md:py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${isActive ? 'bg-[#c2e7ff] text-[#001d35]' : 'text-[#444746] hover:bg-[#e8eaed] bg-white md:bg-transparent border md:border-transparent border-[#dadce0]'}`}
+                            href={nav === '' ? '/' : `/?folder=${encodeURIComponent(nav)}`}
+                            className={`flex items-center gap-2 md:gap-3 px-4 py-2.5 md:py-2 rounded-full text-sm font-medium transition-colors whitespace-nowrap shrink-0 ${isExactActive ? 'bg-[#c2e7ff] text-[#001d35]' : (isActive ? 'bg-[#e8eaed] text-[#1f1f1f]' : 'text-[#444746] hover:bg-[#e8eaed] bg-white md:bg-transparent border md:border-transparent border-[#dadce0]')}`}
                          >
-                            {nav === 'Trang Tổng Quan' ? (
+                            {nav === '' ? (
                                <svg className="w-4 h-4 md:w-5 md:h-5 shrink-0" fill={isActive ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isActive ? '0' : '2'} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
                             ) : (
                                <svg className={`w-4 h-4 md:w-5 md:h-5 shrink-0 ${isActive ? 'text-[#001d35]' : 'text-[#444746]'}`} fill={isActive ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isActive ? '0' : '2'} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z"></path></svg>
@@ -87,7 +87,7 @@ export default async function Dashboard({ searchParams }) {
 
           {/* Main Content Area */}
           <main className="flex-1 flex flex-col min-w-0 bg-white md:rounded-t-[1.5rem] md:mr-4 md:mb-4 shadow-sm border border-gray-200 overflow-hidden">
-             <FileExplorer files={displayFiles} selectedFolder={selectedFolder} />
+             <FileExplorer files={allFiles} selectedFolder={currentPath} />
           </main>
       </div>
     </div>
