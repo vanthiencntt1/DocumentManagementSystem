@@ -12,29 +12,58 @@ import 'react-quill/dist/quill.snow.css';
 export default function EditorComponent({ streamUrl, filePath, fileName, canEdit }) {
   const [isEditing, setIsEditing] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [htmlContent, setHtmlContent] = useState('');
+  const [originalHtml, setOriginalHtml] = useState('');
   const [editHtml, setEditHtml] = useState('');
   const [history, setHistory] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
   const router = useRouter();
 
-  // Tải nội dung DOCX qua mammoth khi component mount
+  const viewerRef = useRef(null);
+
+  const loadScript = (src) => new Promise((resolve, reject) => {
+      if (document.querySelector(`script[src="${src}"]`)) return resolve();
+      const script = document.createElement('script');
+      script.src = src;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.body.appendChild(script);
+  });
+
+  // Tải nội dung DOCX
   useEffect(() => {
     const loadDocx = async () => {
        try {
            const res = await fetch(streamUrl);
            const blob = await res.blob();
-           const arrayBuffer = await blob.arrayBuffer();
            
+           // 1. Dùng mammoth để trích xuất text thuần cho việc Sửa Nhanh (Quill)
+           const arrayBuffer = await blob.arrayBuffer();
            const result = await mammoth.convertToHtml({ arrayBuffer });
-           setHtmlContent(result.value);
+           setOriginalHtml(result.value);
            setEditHtml(result.value);
+
+           // 2. Dùng docx-preview để render layout chính xác 99% cho chế độ Xem
+           if (fileName.toLowerCase().endsWith('.docx')) {
+               await loadScript("https://unpkg.com/jszip/dist/jszip.min.js");
+               await loadScript("https://unpkg.com/docx-preview/dist/docx-preview.min.js");
+               
+               if (window.docx && viewerRef.current) {
+                   await window.docx.renderAsync(blob, viewerRef.current, null, {
+                       className: 'docx-viewer',
+                       inWrapper: false,
+                       ignoreWidth: false,
+                       ignoreHeight: false,
+                       ignoreFonts: false,
+                       breakPages: true
+                   });
+               }
+           }
        } catch (error) {
-           console.error("Mammoth convert error", error);
+           console.error("Lỗi đọc file DOCX", error);
        }
     };
     loadDocx();
-  }, [streamUrl]);
+  }, [streamUrl, fileName]);
 
   // Load Lịch sử phiên bản
   useEffect(() => {
@@ -232,7 +261,7 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
               <>
                 <button
                   disabled={loading}
-                  onClick={() => { setIsEditing(false); setEditHtml(htmlContent); }}
+                  onClick={() => { setIsEditing(false); setEditHtml(originalHtml); }}
                   className="flex-1 sm:flex-none justify-center text-slate-600 bg-white border border-slate-300 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold hover:bg-slate-50 transition"
                 >
                   Hủy bỏ
@@ -249,25 +278,25 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
           </div>
         </div>
 
-        <div className="flex-1 w-full bg-slate-100/50 overflow-y-auto" style={{height: '800px'}}>
-           <div className="max-w-[900px] mx-auto bg-white min-h-[1056px] my-4 md:my-8 shadow-[0_0_15px_rgba(0,0,0,0.05)] border border-slate-200">
-               {isEditing ? (
-                  <div className="h-full">
-                      <ReactQuill 
-                         theme="snow" 
-                         value={editHtml} 
-                         onChange={setEditHtml} 
-                         modules={modules}
-                         className="h-full border-none [&_.ql-toolbar]:border-x-0 [&_.ql-toolbar]:border-t-0 [&_.ql-container]:border-none [&_.ql-editor]:min-h-[1000px] [&_.ql-editor]:text-[14px] md:[&_.ql-editor]:text-[16px] [&_.ql-editor]:font-['Inter'] [&_.ql-editor]:p-4 md:[&_.ql-editor]:p-12"
-                      />
-                  </div>
-               ) : (
-                  <div 
-                      id="document-content-container"
-                      className="p-4 md:p-12 text-[14px] md:text-[16px] font-['Inter'] leading-relaxed text-slate-800 prose max-w-none [&_table]:border-collapse [&_table]:w-full [&_table]:overflow-x-auto [&_td]:border [&_td]:border-slate-300 [&_td]:p-2 [&_img]:max-w-full"
-                      dangerouslySetInnerHTML={{ __html: htmlContent }} 
-                  />
-               )}
+        <div className="flex-1 w-full bg-[#f0f4f9] overflow-y-auto" style={{height: '800px'}}>
+           <div className={`max-w-[950px] mx-auto bg-white min-h-[1056px] my-4 md:my-8 shadow-sm border border-[#dadce0] ${isEditing ? 'block' : 'hidden'}`}>
+                <div className="h-full">
+                    <ReactQuill 
+                        theme="snow" 
+                        value={editHtml} 
+                        onChange={setEditHtml} 
+                        modules={modules}
+                        className="h-full border-none [&_.ql-toolbar]:border-x-0 [&_.ql-toolbar]:border-t-0 [&_.ql-container]:border-none [&_.ql-editor]:min-h-[1000px] [&_.ql-editor]:text-[14px] md:[&_.ql-editor]:text-[16px] [&_.ql-editor]:font-['Inter'] [&_.ql-editor]:p-4 md:[&_.ql-editor]:p-12"
+                    />
+                </div>
+           </div>
+           
+           <div className={`${isEditing ? 'hidden' : 'block'}`}>
+                <div 
+                    id="document-content-container"
+                    ref={viewerRef}
+                    className="max-w-[1000px] mx-auto my-4 md:my-8 p-0 docx-wrapper-custom"
+                />
            </div>
         </div>
       </div>
