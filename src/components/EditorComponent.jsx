@@ -20,6 +20,13 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
 
   const viewerRef = useRef(null);
 
+  const ext = fileName.split('.').pop().toLowerCase();
+  const isDocx = ext === 'docx';
+  const isVideo = ['mp4', 'mov', 'avi', 'webm', 'mkv'].includes(ext);
+  const isImage = ['jpg', 'jpeg', 'png', 'gif', 'svg', 'webp'].includes(ext);
+  const isTxt = ext === 'txt';
+  const isPdf = ext === 'pdf';
+
   const loadScript = (src) => new Promise((resolve, reject) => {
       if (document.querySelector(`script[src="${src}"]`)) return resolve();
       const script = document.createElement('script');
@@ -29,21 +36,21 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
       document.body.appendChild(script);
   });
 
-  // Tải nội dung DOCX
+  // Tải nội dung
   useEffect(() => {
-    const loadDocx = async () => {
+    const loadFile = async () => {
        try {
-           const res = await fetch(streamUrl);
-           const blob = await res.blob();
-           
-           // 1. Dùng mammoth để trích xuất text thuần cho việc Sửa Nhanh (Quill)
-           const arrayBuffer = await blob.arrayBuffer();
-           const result = await mammoth.convertToHtml({ arrayBuffer });
-           setOriginalHtml(result.value);
-           setEditHtml(result.value);
+           if (isDocx) {
+               const res = await fetch(streamUrl);
+               const blob = await res.blob();
+               
+               // 1. Dùng mammoth để trích xuất text thuần cho việc Sửa Nhanh (Quill)
+               const arrayBuffer = await blob.arrayBuffer();
+               const result = await mammoth.convertToHtml({ arrayBuffer });
+               setOriginalHtml(result.value);
+               setEditHtml(result.value);
 
-           // 2. Dùng docx-preview để render layout chính xác 99% cho chế độ Xem
-           if (fileName.toLowerCase().endsWith('.docx')) {
+               // 2. Dùng docx-preview để render layout chính xác
                await loadScript("https://unpkg.com/jszip/dist/jszip.min.js");
                await loadScript("https://unpkg.com/docx-preview/dist/docx-preview.min.js");
                
@@ -57,13 +64,19 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
                        breakPages: true
                    });
                }
+           } else if (isTxt) {
+               const res = await fetch(streamUrl);
+               const text = await res.text();
+               const htmlText = `<p>${text.replace(/\n/g, '<br/>')}</p>`;
+               setOriginalHtml(htmlText);
+               setEditHtml(htmlText);
            }
        } catch (error) {
-           console.error("Lỗi đọc file DOCX", error);
+           console.error("Lỗi đọc file", error);
        }
     };
-    loadDocx();
-  }, [streamUrl, fileName]);
+    loadFile();
+  }, [streamUrl, fileName, isDocx, isTxt]);
 
   // Load Lịch sử phiên bản
   useEffect(() => {
@@ -206,7 +219,7 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row w-full relative">
-      <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept=".docx,.xlsx,.pdf" />
+      <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
       {/* Editor / Viewer Area */}
       <div className={`flex-1 flex flex-col bg-white border border-slate-200 shadow-sm lg:rounded-xl overflow-hidden ${showHistory ? 'lg:mr-4 mb-4 lg:mb-0' : ''} transition-all`}>
         <div className="border-b border-slate-200 px-4 md:px-6 py-4 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 z-10 sticky top-0 relative">
@@ -225,7 +238,7 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
                Lịch sử ({history.length})
             </button>
 
-            {fileName.toLowerCase().endsWith('.docx') && !isEditing && (
+            {isDocx && !isEditing && (
                 <button
                    onClick={handleExportPdf}
                    disabled={loading}
@@ -243,18 +256,20 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
                   onClick={() => fileInputRef.current.click()}
                   disabled={loading}
                   className="flex-1 sm:flex-none justify-center bg-white text-indigo-600 border border-indigo-200 px-3 py-2 rounded-xl text-xs sm:text-sm font-bold hover:bg-indigo-50 transition shadow-sm flex items-center gap-2 whitespace-nowrap"
-                  title="Tải lên một file .docx từ máy tính để đè lên file hiện tại"
+                  title="Tải lên một file mới từ máy tính để đè lên file hiện tại"
                 >
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
                   {loading ? 'Đang tải...' : 'Upload Mới'}
                 </button>
-                <button
-                  onClick={() => setIsEditing(true)}
-                  className="flex-1 sm:flex-none justify-center bg-blue-600 text-white px-3 py-2 rounded-xl text-xs sm:text-sm font-bold hover:bg-blue-700 transition shadow-md flex items-center gap-2 whitespace-nowrap"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                  Sửa Nhanh
-                </button>
+                {(isDocx || isTxt) && (
+                    <button
+                      onClick={() => setIsEditing(true)}
+                      className="flex-1 sm:flex-none justify-center bg-blue-600 text-white px-3 py-2 rounded-xl text-xs sm:text-sm font-bold hover:bg-blue-700 transition shadow-md flex items-center gap-2 whitespace-nowrap"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                      Sửa Nhanh
+                    </button>
+                )}
               </>
             )}
             {isEditing && (
@@ -291,12 +306,48 @@ export default function EditorComponent({ streamUrl, filePath, fileName, canEdit
                 </div>
            </div>
            
-           <div className={`${isEditing ? 'hidden' : 'block'}`}>
-                <div 
-                    id="document-content-container"
-                    ref={viewerRef}
-                    className="max-w-[1000px] mx-auto my-4 md:my-8 p-0 docx-wrapper-custom"
-                />
+           <div className={`${isEditing ? 'hidden' : 'flex'} w-full h-full flex-col items-center justify-start`}>
+                {isDocx && (
+                    <div 
+                        id="document-content-container"
+                        ref={viewerRef}
+                        className="max-w-[1000px] w-full mx-auto my-4 md:my-8 p-0 docx-wrapper-custom bg-white"
+                    />
+                )}
+                {isTxt && (
+                    <div id="document-content-container" className="max-w-[1000px] w-full mx-auto my-4 md:my-8 p-8 bg-white border border-slate-200 shadow-sm whitespace-pre-wrap font-mono text-sm leading-relaxed text-slate-800">
+                        {originalHtml.replace(/<[^>]+>/g, '\n').trim()}
+                    </div>
+                )}
+                {isVideo && (
+                    <div className="w-full flex-1 flex items-center justify-center p-4">
+                        <video controls className="max-w-full max-h-[700px] rounded-xl shadow-lg bg-black outline-none border border-slate-700">
+                            <source src={streamUrl} type={`video/${ext === 'mov' ? 'mp4' : ext}`} />
+                            Trình duyệt của bạn không hỗ trợ video này.
+                        </video>
+                    </div>
+                )}
+                {isImage && (
+                    <div className="w-full flex-1 flex items-center justify-center p-4">
+                        <img src={streamUrl} alt={fileName} className="max-w-full max-h-[700px] rounded-xl shadow-md border border-slate-200" />
+                    </div>
+                )}
+                {isPdf && (
+                    <div className="w-full flex-1 h-[800px] p-0 md:p-4">
+                        <iframe src={streamUrl} className="w-full h-full rounded-xl shadow-md border border-slate-200 bg-white" title={fileName} />
+                    </div>
+                )}
+                {(!isDocx && !isTxt && !isVideo && !isImage && !isPdf) && (
+                    <div className="flex flex-col items-center justify-center flex-1 p-8 text-[#444746]">
+                        <svg className="w-24 h-24 md:w-32 md:h-32 mb-4 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                        <h3 className="text-xl md:text-2xl font-normal mb-2 text-center">Định dạng không hỗ trợ xem trực tiếp</h3>
+                        <p className="text-sm text-center max-w-[400px]">Định dạng `.{ext}` hiện chưa được hỗ trợ xem trước. Vui lòng tải file về máy để xem nội dung.</p>
+                        <a href={streamUrl} download={fileName} className="mt-6 bg-[#0b57d0] text-white px-6 py-2.5 rounded-full font-medium hover:bg-[#0842a0] transition shadow-sm flex items-center gap-2">
+                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                           Tải file xuống
+                        </a>
+                    </div>
+                )}
            </div>
         </div>
       </div>

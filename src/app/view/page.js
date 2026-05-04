@@ -79,43 +79,8 @@ export default async function ViewPage({ searchParams }) {
       <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8">
           <div className="w-full max-w-5xl bg-white shadow-lg rounded-2xl border border-gray-200 overflow-hidden flex flex-col" style={{ minHeight: '75vh' }}>
               
-              {/* PDF VIEWER */}
-              {ext === 'pdf' && (
-                  <iframe 
-                      src={`${streamUrl}#toolbar=0`} 
-                      className="w-full h-full flex-1 min-h-[75vh]" 
-                      title={fileName}
-                  />
-              )}
-
-              {/* IMAGE VIEWER */}
-              {(ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'webp') && (
-                  <div className="flex-1 flex items-center justify-center p-8 bg-gray-100 min-h-[75vh]">
-                      <img src={streamUrl} alt={fileName} className="max-w-full max-h-full rounded shadow" />
-                  </div>
-              )}
-
-              {/* VIDEO VIEWER */}
-              {(ext === 'mp4' || ext === 'webm') && (
-                  <div className="flex-1 flex items-center justify-center bg-black min-h-[75vh]">
-                      <video controls className="w-full h-full max-h-[75vh]">
-                          <source src={streamUrl} type={`video/${ext}`} />
-                          Trình duyệt của bạn không hỗ trợ phát thẻ video.
-                      </video>
-                  </div>
-              )}
-
-              {/* DOCX RENDERER VIEWER */}
-              {ext === 'docx' && (
-                 <EditorComponent 
-                   filePath={pathParam} 
-                   fileName={fileName}
-                   canEdit={canEdit}
-                   streamUrl={streamUrl}
-                 />
-              )}
-
-              {(ext === 'xlsx' || ext === 'xls') && (
+              {/* RENDER EXCEL (SERVER-SIDE) */}
+              {(ext === 'xlsx' || ext === 'xls') ? (
                 <div className="flex-1 flex flex-col bg-white min-h-[75vh] p-8 sm:p-12 overflow-y-auto max-h-[75vh]">
                      {docHtml ? (
                          <div 
@@ -128,16 +93,13 @@ export default async function ViewPage({ searchParams }) {
                          </div>
                      )}
                 </div>
-              )}
-
-              {/* UNSUPPORTED FILES */}
-              {(!['pdf', 'png', 'jpg', 'jpeg', 'webp', 'mp4', 'webm', 'docx', 'xlsx', 'xls'].includes(ext)) && (
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-12 min-h-[75vh] bg-gray-50">
-                      <div className="bg-indigo-100 text-indigo-500 rounded-full p-6 mb-6">
-                         <svg className="w-16 h-16" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                      </div>
-                      <h3 className="text-2xl font-bold text-gray-800 mb-2">Không thể xem trước định dạng .{ext?.toUpperCase()}</h3>
-                  </div>
+              ) : (
+                  <EditorComponent 
+                    filePath={pathParam} 
+                    fileName={fileName}
+                    canEdit={canEdit}
+                    streamUrl={streamUrl}
+                  />
               )}
           </div>
       </main>

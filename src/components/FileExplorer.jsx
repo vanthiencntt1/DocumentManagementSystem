@@ -243,7 +243,7 @@ export default function FileExplorer({ files, selectedFolder }) {
          </div>
 
          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 mt-2 sm:mt-0">
-            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} accept=".docx,.xlsx,.pdf" />
+            <input type="file" ref={fileInputRef} className="hidden" onChange={handleFileUpload} />
             
             <button 
                onClick={handleCreateFolder} 

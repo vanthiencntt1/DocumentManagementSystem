@@ -72,20 +72,18 @@ export async function listAllFilesFtp() {
                 
                 await scanDir(absolutePath, nextHospital);
             } else {
-                if (item.name.toLowerCase().endsWith('.docx') || item.name.toLowerCase().endsWith('.xlsx') || item.name.toLowerCase().endsWith('.pdf')) {
-                    try {
-                        const stat = await fs.stat(absolutePath);
-                        allFiles.push({
-                            name: item.name,
-                            path: relativePath,
-                            hospital: hospitalName,
-                            isDirectory: false,
-                            size: stat.size,
-                            updatedAt: stat.mtime
-                        });
-                    } catch (e) {
-                        console.error("Lỗi đọc file stat:", absolutePath, e);
-                    }
+                try {
+                    const stat = await fs.stat(absolutePath);
+                    allFiles.push({
+                        name: item.name,
+                        path: relativePath,
+                        hospital: hospitalName,
+                        isDirectory: false,
+                        size: stat.size,
+                        updatedAt: stat.mtime
+                    });
+                } catch (e) {
+                    console.error("Lỗi đọc file stat:", absolutePath, e);
                 }
             }
         }
